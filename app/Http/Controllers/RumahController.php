@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\HistoryRumah;
 use App\Models\Penghuni;
 use App\Models\Rumah;
 use Illuminate\Http\Request;
@@ -31,6 +32,8 @@ class RumahController extends Controller
         $validator = Validator::make($request->all(), [
             'alamat' => 'required|string',
             'status_rumah' => 'required|string',
+            'tanggal_mulai_huni' => 'required|date',
+            'tanggal_akhir_huni' => 'required|date',
             'penghuni.*.nama_lengkap' => 'required|string',
             'penghuni.*.status_penghuni' => 'required|string',
             'penghuni.*.nomor_telepon' => 'required|string',
@@ -53,7 +56,6 @@ class RumahController extends Controller
             $rumah->status_rumah = $request->status_rumah;
             $rumah->save();
 
-            $penghuniArr = [];
             if ($request->status_rumah == 'Dihuni') {
                 foreach ($request->penghuni as $index => $penghuniData) {
                     $penghuni = new Penghuni();
@@ -68,12 +70,12 @@ class RumahController extends Controller
                     }
                     $penghuni->save();
 
-                    $penghuniArr[] = [
-                        'nama_lengkap' => $penghuni->nama_lengkap,
-                        'status_penghuni' => $penghuni->status_penghuni,
-                        'nomor_telepon' => $penghuni->nomor_telepon,
-                        'status_menikah' => $penghuni->status_menikah
-                    ];
+                    $historyRumah = new HistoryRumah();
+                    $historyRumah->rumah_id = $rumah->id;
+                    $historyRumah->penghuni_id = $penghuni->id;
+                    $historyRumah->tanggal_mulai_huni = $request->tanggal_mulai_huni;
+                    $historyRumah->tanggal_akhir_huni = $request->tanggal_akhir_huni;
+                    $historyRumah->save();
                 }
             }
             return response()->json([
@@ -114,11 +116,17 @@ class RumahController extends Controller
     public function edit($id)
     {
         try {
-            $data = Rumah::with(['penghuni' => function ($query) {
-                $query->select('id', 'rumah_id', 'nama_lengkap', 'status_penghuni', 'nomor_telepon', 'status_menikah');
-                $query->where('status_penghuni', 'Tetap');
-                $query->orWhere('status_penghuni', 'Kontrak');
-            }])->find($id);
+            $data = Rumah::with([
+                'penghuni' => function ($query) {
+                    $query->select('id', 'rumah_id', 'nama_lengkap', 'status_penghuni', 'nomor_telepon', 'status_menikah')
+                          ->where('status_penghuni', 'Tetap')
+                          ->orWhere('status_penghuni', 'Kontrak');
+                },
+                'historyRumah' => function ($query) {
+                    $query->select('id', 'rumah_id', 'tanggal_mulai_huni', 'tanggal_akhir_huni')
+                          ->limit(1);
+                }
+            ])->find($id);
 
             return response()->json([
                 'status' => 'success',
@@ -136,6 +144,8 @@ class RumahController extends Controller
         $validator = Validator::make($request->all(), [
             'alamat' => 'string',
             'status_rumah' => 'string',
+            'tanggal_mulai_huni' => 'date',
+            'tanggal_akhir_huni' => 'date',
             'penghuni.*.nama_lengkap' => 'string',
             'penghuni.*.status_penghuni' => 'string',
             'penghuni.*.nomor_telepon' => 'string',
@@ -163,6 +173,11 @@ class RumahController extends Controller
                     if (!empty($penghuniData['id'])) {
                         $penghuni = Penghuni::find($penghuniData['id']);
                         if ($penghuni) {
+                            $historyRumah = HistoryRumah::where('penghuni_id', $penghuni->id)->first();
+                            $historyRumah->tanggal_mulai_huni = $request->tanggal_mulai_huni ?? $historyRumah->tanggal_mulai_huni;
+                            $historyRumah->tanggal_akhir_huni = $request->tanggal_akhir_huni ?? $historyRumah->tanggal_akhir_huni;
+                            $historyRumah->save();
+
                             continue;
                         }
                     }
@@ -180,6 +195,13 @@ class RumahController extends Controller
                     }
 
                     $penghuni->save();
+
+                    $historyRumah = new HistoryRumah();
+                    $historyRumah->rumah_id = $rumah->id;
+                    $historyRumah->penghuni_id = $penghuni->id;
+                    $historyRumah->tanggal_mulai_huni = $request->tanggal_mulai_huni;
+                    $historyRumah->tanggal_akhir_huni = $request->tanggal_akhir_huni;
+                    $historyRumah->save();
                 }
 
                 foreach ($existingPenghuni as $penghuni) {
