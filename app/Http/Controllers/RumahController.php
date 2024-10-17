@@ -32,8 +32,8 @@ class RumahController extends Controller
         $validator = Validator::make($request->all(), [
             'alamat' => 'required|string',
             'status_rumah' => 'required|string',
-            'tanggal_mulai_huni' => 'required|date',
-            'tanggal_akhir_huni' => 'required|date',
+            'tanggal_mulai_huni' => 'date',
+            'tanggal_akhir_huni' => 'date',
             'penghuni.*.nama_lengkap' => 'required|string',
             'penghuni.*.status_penghuni' => 'required|string',
             'penghuni.*.nomor_telepon' => 'required|string',
@@ -97,6 +97,9 @@ class RumahController extends Controller
             $data = Rumah::with(['penghuni' => function ($query) {
                 $query->where('status_penghuni', 'Tetap');
                 $query->orWhere('status_penghuni', 'Kontrak');
+            }, 'historyRumah' => function ($query) {
+                $query->select('id', 'rumah_id', 'tanggal_mulai_huni', 'tanggal_akhir_huni')
+                    ->limit(1);
             }])->find($id);
 
             foreach ($data->penghuni as $penghuni) {
@@ -119,12 +122,12 @@ class RumahController extends Controller
             $data = Rumah::with([
                 'penghuni' => function ($query) {
                     $query->select('id', 'rumah_id', 'nama_lengkap', 'status_penghuni', 'nomor_telepon', 'status_menikah')
-                          ->where('status_penghuni', 'Tetap')
-                          ->orWhere('status_penghuni', 'Kontrak');
+                        ->where('status_penghuni', 'Tetap')
+                        ->orWhere('status_penghuni', 'Kontrak');
                 },
                 'historyRumah' => function ($query) {
                     $query->select('id', 'rumah_id', 'tanggal_mulai_huni', 'tanggal_akhir_huni')
-                          ->limit(1);
+                        ->limit(1);
                 }
             ])->find($id);
 
@@ -140,7 +143,7 @@ class RumahController extends Controller
 
     public function update(Request $request, $id)
     {
-        Log::info($request->all());
+        // Log::info($request->all());
         $validator = Validator::make($request->all(), [
             'alamat' => 'string',
             'status_rumah' => 'string',
@@ -166,8 +169,6 @@ class RumahController extends Controller
             $rumah->status_rumah = $request->status_rumah ?? $rumah->status_rumah;
             $rumah->save();
 
-            $penghuniIdsInRequest = collect($request->penghuni)->pluck('id')->filter()->toArray();
-            $existingPenghuni = Penghuni::where('rumah_id', $rumah->id)->get();
             if ($request->status_rumah == 'Dihuni') {
                 foreach ($request->penghuni as $index => $penghuniData) {
                     if (!empty($penghuniData['id'])) {
@@ -203,30 +204,17 @@ class RumahController extends Controller
                     $historyRumah->tanggal_akhir_huni = $request->tanggal_akhir_huni;
                     $historyRumah->save();
                 }
-
-                foreach ($existingPenghuni as $penghuni) {
-                    if (!in_array($penghuni->id, $penghuniIdsInRequest)) {
-                        if ($penghuni->foto_ktp) {
-                            Storage::disk('public')->delete($penghuni->foto_ktp);
-                        }
-                        $penghuni->delete();
-                    }
-                }
             } elseif ($request->status_rumah == 'Tidak Dihuni') {
-                foreach ($existingPenghuni as $penghuni) {
-                    if (!in_array($penghuni->id, $penghuniIdsInRequest)) {
-                        if ($penghuni->foto_ktp) {
-                            Storage::disk('public')->delete($penghuni->foto_ktp);
-                        }
-                        $penghuni->delete();
-                    }
+                $penghunis = Penghuni::where('rumah_id', $rumah->id)->get();
+                foreach ($penghunis as $penghuni) {
+                    $penghuni->status_penghuni = 'Keluar';
+                    $penghuni->save();
                 }
             }
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Data rumah dan penghuni berhasil diupdate',
-                'data'
+                'message' => 'Data rumah dan penghuni berhasil diupdate'
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -234,6 +222,55 @@ class RumahController extends Controller
                 'message' => 'Update data rumah gagal: ' . $e->getMessage(),
                 'data' => [],
             ], 500);
+        }
+    }
+
+    public function perubahanKepemilikan($id)
+    {
+        try {
+            $rumah = Rumah::find($id);
+            foreach ($rumah->penghuni as $penghuni) {
+                $penghuni = Penghuni::find($penghuni->id);
+
+                if ($penghuni) {
+                    $penghuni->status_penghuni = 'Keluar';
+                    $penghuni->save();
+                }
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Perubahan kepemilikan berhasil'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Perubahan kepemilikan gagal diperbarui: ' . $e->getMessage(),
+                'data' => [],
+            ], 500);
+        }
+    }
+
+    public function historicalPenghuni($id) {
+        try {
+            $data = Rumah::with(['penghuni' => function ($query) {
+                $query->where('status_penghuni', 'Keluar')
+                      ->with(['historyRumah' => function ($historyQuery) {
+                          $historyQuery->select('id', 'penghuni_id', 'tanggal_mulai_huni', 'tanggal_akhir_huni');
+                      }]);
+            }])->find($id);
+
+            foreach ($data->penghuni as $penghuni) {
+                $penghuni->foto_ktp = url('storage/' . $penghuni->foto_ktp);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Daftar Rumah berdasarkan id berhasil didapat',
+                'data' => $data
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 }
