@@ -21,3 +21,6 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 Route::get('/rumah', [RumahController::class, 'index']);
 Route::post('/rumah', [RumahController::class, 'store']);
+Route::get('/rumah/{id}', [RumahController::class, 'show']);
+Route::get('/rumah/{id}/edit', [RumahController::class, 'edit']);
+Route::post('/rumah/{id}', [RumahController::class, 'update']);
