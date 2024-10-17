@@ -24,3 +24,5 @@ Route::post('/rumah', [RumahController::class, 'store']);
 Route::get('/rumah/{id}', [RumahController::class, 'show']);
 Route::get('/rumah/{id}/edit', [RumahController::class, 'edit']);
 Route::post('/rumah/{id}', [RumahController::class, 'update']);
+Route::post('/rumah/{id}/perubahan-kepemilikan', [RumahController::class, 'perubahanKepemilikan']);
+Route::get('/rumah/{id}/historical-penghuni', [RumahController::class, 'historicalPenghuni']);
