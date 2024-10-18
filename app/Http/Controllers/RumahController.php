@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\HistoryRumah;
+use App\Models\Iuran;
+use App\Models\Pembayaran;
 use App\Models\Penghuni;
 use App\Models\Rumah;
 use Illuminate\Http\Request;
@@ -92,10 +94,28 @@ class RumahController extends Controller
                     $historyRumah->tanggal_akhir_huni = $request->tanggal_akhir_huni;
                     $historyRumah->save();
                 }
+
+                $tanggalMulaiHuni = $request->tanggal_mulai_huni;
+                $tanggalAkhirHuni = $request->tanggal_akhir_huni;
+
+                $iuranDalamRentang = Iuran::whereBetween('tanggal_tagihan', [$tanggalMulaiHuni, $tanggalAkhirHuni])->get();
+
+                if ($iuranDalamRentang->isNotEmpty()) {
+                    foreach ($iuranDalamRentang as $iuran) {
+                        foreach ($request->penghuni as $penghuniData) {
+                            $pembayaran = new Pembayaran();
+                            $pembayaran->penghuni_id = $penghuni->id;
+                            $pembayaran->iuran_id = $iuran->id;
+                            $pembayaran->biaya_pembayaran = $iuran->biaya;
+                            $pembayaran->save();
+                        }
+                    }
+                }
             }
+
             return response()->json([
                 'status' => 'success',
-                'message' => 'Penambahan data rumah berhasil'
+                'message' => 'Penambahan data rumah berhasil',
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -218,6 +238,23 @@ class RumahController extends Controller
                     $historyRumah->tanggal_mulai_huni = $request->tanggal_mulai_huni;
                     $historyRumah->tanggal_akhir_huni = $request->tanggal_akhir_huni;
                     $historyRumah->save();
+
+                    $tanggalMulaiHuni = $request->tanggal_mulai_huni;
+                    $tanggalAkhirHuni = $request->tanggal_akhir_huni;
+
+                    $iuranDalamRentang = Iuran::whereBetween('tanggal_tagihan', [$tanggalMulaiHuni, $tanggalAkhirHuni])->get();
+
+                    if ($iuranDalamRentang->isNotEmpty()) {
+                        foreach ($iuranDalamRentang as $iuran) {
+                            foreach ($request->penghuni as $penghuniData) {
+                                $pembayaran = new Pembayaran();
+                                $pembayaran->penghuni_id = $penghuni->id;
+                                $pembayaran->iuran_id = $iuran->id;
+                                $pembayaran->biaya_pembayaran = $iuran->biaya;
+                                $pembayaran->save();
+                            }
+                        }
+                    }
                 }
             } elseif ($request->status_rumah == 'Tidak Dihuni') {
                 $penghunis = Penghuni::where('rumah_id', $rumah->id)->get();
@@ -278,6 +315,10 @@ class RumahController extends Controller
 
             foreach ($data->penghuni as $penghuni) {
                 $penghuni->foto_ktp = url('storage/' . $penghuni->foto_ktp);
+
+                foreach ($penghuni->pembayaran as $pembayaran) {
+                    $pembayaran->delete();
+                }
             }
 
             return response()->json([
