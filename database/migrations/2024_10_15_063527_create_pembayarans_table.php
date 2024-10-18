@@ -13,10 +13,11 @@ return new class extends Migration
     {
         Schema::create('pembayarans', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('rumah_id')->constrained('rumahs')->cascadeOnUpdate()->cascadeOnDelete();
-            $table->date('tanggal_pembayaran');
-            $table->integer('jumlah_pembayaran');
-            $table->string('status_pembayaran');
+            $table->foreignId('penghuni_id')->constrained('penghunis')->cascadeOnUpdate()->cascadeOnDelete();
+            $table->foreignId('iuran_id')->constrained('iurans')->cascadeOnUpdate()->cascadeOnDelete();
+            $table->integer('biaya_pembayaran');
+            $table->date('tanggal_pembayaran')->nullable();
+            $table->string('status_pembayaran')->default('Belum Lunas');
             $table->timestamps();
         });
     }

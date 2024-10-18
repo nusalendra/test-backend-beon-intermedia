@@ -19,4 +19,8 @@ class Penghuni extends Model
     public function historyRumah() {
         return $this->hasMany(HistoryRumah::class, 'penghuni_id');
     }
+
+    public function pembayaran() {
+        return $this->hasMany(Pembayaran::class, 'penghuni_id');
+    }
 }

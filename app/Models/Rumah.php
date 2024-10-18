@@ -16,10 +16,6 @@ class Rumah extends Model
         return $this->hasMany(Penghuni::class, 'rumah_id');
     }
 
-    public function pembayaran() {
-        return $this->hasMany(Pembayaran::class, 'rumah_id');
-    }
-
     public function historyRumah() {
         return $this->hasMany(HistoryRumah::class, 'rumah_id');
     }

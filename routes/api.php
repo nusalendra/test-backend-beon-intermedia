@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\PembayaranIuranController;
 use App\Http\Controllers\RumahController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -26,3 +27,10 @@ Route::get('/rumah/{id}/edit', [RumahController::class, 'edit']);
 Route::post('/rumah/{id}', [RumahController::class, 'update']);
 Route::post('/rumah/{id}/perubahan-kepemilikan', [RumahController::class, 'perubahanKepemilikan']);
 Route::get('/rumah/{id}/historical-penghuni', [RumahController::class, 'historicalPenghuni']);
+Route::get('/rumah/{id}/cek-tagihan', [RumahController::class, 'cekTagihan']);
+Route::get('/rumah/{id}/cek-tagihan-tahunan', [RumahController::class, 'cekTagihanTahunan']);
+
+Route::get('/pembayaran-iuran', [PembayaranIuranController::class, 'index']);
+Route::post('/pembayaran-iuran', [PembayaranIuranController::class, 'store']);
+Route::post('/pembayaran-iuran/{id}/bayar-tagihan-bulanan', [PembayaranIuranController::class, 'bayarTagihanBulanan']);
+Route::post('/pembayaran-iuran/bayar-tagihan-tahunan', [PembayaranIuranController::class, 'bayarTagihanTahunan']);
