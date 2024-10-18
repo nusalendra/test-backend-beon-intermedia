@@ -337,9 +337,6 @@ class RumahController extends Controller
             $data = Rumah::with([
                 'penghuni' => function ($query) {
                     $query->whereIn('status_penghuni', ['Tetap', 'Kontrak']);
-                },
-                'penghuni.pembayaran' => function ($query) {
-                    $query->where('status_pembayaran', 'Belum Lunas');
                 }
             ])->find($id);
 
@@ -358,7 +355,8 @@ class RumahController extends Controller
                             'nama_iuran' => $pembayaran->iuran->nama,
                             'biaya_iuran' => $pembayaran->iuran->biaya,
                             'tanggal_tagihan' => $pembayaran->iuran->tanggal_tagihan,
-                            'total_tagihan' => $totalTagihan
+                            'total_tagihan' => $totalTagihan,
+                            'status_pembayaran' => $pembayaran->status_pembayaran
                         ];
                         $iuranTercatat[] = $pembayaran->iuran->id;
                     }
