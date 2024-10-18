@@ -15,7 +15,21 @@ class RumahController extends Controller
     public function index()
     {
         try {
-            $data = Rumah::all();
+            $data = Rumah::with('penghuni.pembayaran')->get();
+
+            $data = $data->map(function ($rumah) {
+                $totalBelumBayar = 0;
+
+                foreach ($rumah->penghuni as $penghuni) {
+                    $totalBelumBayar += $penghuni->pembayaran
+                        ->where('status_pembayaran', 'Belum Lunas')
+                        ->sum('biaya_pembayaran');
+                }
+
+                $rumah->setAttribute('total_belum_bayar', $totalBelumBayar);
+
+                return $rumah;
+            });
 
             return response()->json([
                 'status' => 'success',
@@ -26,6 +40,7 @@ class RumahController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
+
 
     public function store(Request $request)
     {
@@ -251,13 +266,14 @@ class RumahController extends Controller
         }
     }
 
-    public function historicalPenghuni($id) {
+    public function historicalPenghuni($id)
+    {
         try {
             $data = Rumah::with(['penghuni' => function ($query) {
                 $query->where('status_penghuni', 'Keluar')
-                      ->with(['historyRumah' => function ($historyQuery) {
-                          $historyQuery->select('id', 'penghuni_id', 'tanggal_mulai_huni', 'tanggal_akhir_huni');
-                      }]);
+                    ->with(['historyRumah' => function ($historyQuery) {
+                        $historyQuery->select('id', 'penghuni_id', 'tanggal_mulai_huni', 'tanggal_akhir_huni');
+                    }]);
             }])->find($id);
 
             foreach ($data->penghuni as $penghuni) {
@@ -268,6 +284,111 @@ class RumahController extends Controller
                 'status' => 'success',
                 'message' => 'Daftar Rumah berdasarkan id berhasil didapat',
                 'data' => $data
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function cekTagihan($id)
+    {
+        try {
+            $data = Rumah::with([
+                'penghuni' => function ($query) {
+                    $query->whereIn('status_penghuni', ['Tetap', 'Kontrak']);
+                },
+                'penghuni.pembayaran' => function ($query) {
+                    $query->where('status_pembayaran', 'Belum Lunas');
+                }
+            ])->find($id);
+
+            $result = [];
+            $iuranTercatat = [];
+            $jumlahPenghuni = count($data->penghuni);
+
+            foreach ($data->penghuni as $penghuni) {
+                foreach ($penghuni->pembayaran as $pembayaran) {
+                    if (!in_array($pembayaran->iuran->id, $iuranTercatat)) {
+                        $totalTagihan = $pembayaran->iuran->biaya * $jumlahPenghuni;
+
+                        $result[] = [
+                            'id' => $pembayaran->iuran->id,
+                            'alamat' => $data->alamat,
+                            'nama_iuran' => $pembayaran->iuran->nama,
+                            'biaya_iuran' => $pembayaran->iuran->biaya,
+                            'tanggal_tagihan' => $pembayaran->iuran->tanggal_tagihan,
+                            'total_tagihan' => $totalTagihan
+                        ];
+                        $iuranTercatat[] = $pembayaran->iuran->id;
+                    }
+                }
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Daftar Rumah berdasarkan id berhasil didapat',
+                'data' => [
+                    'alamat' => $data->alamat,
+                    'tagihan' => $result
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function cekTagihanTahunan($id)
+    {
+        try {
+            $data = Rumah::with([
+                'penghuni' => function ($query) {
+                    $query->whereIn('status_penghuni', ['Tetap', 'Kontrak']);
+                },
+                'penghuni.pembayaran' => function ($query) {
+                    $query->where('status_pembayaran', 'Belum Lunas');
+                }
+            ])->find($id);
+
+            $result = [];
+            $iuranTerhitung = [];
+            $jumlahPenghuni = count($data->penghuni);
+
+            foreach ($data->penghuni as $penghuni) {
+                foreach ($penghuni->pembayaran as $pembayaran) {
+                    $namaIuran = $pembayaran->iuran->nama;
+                    $biayaIuran = $pembayaran->iuran->biaya;
+                    $tahunTagihan = date('Y', strtotime($pembayaran->iuran->tanggal_tagihan));
+
+                    $key = $namaIuran . '-' . $tahunTagihan;
+
+                    $totalTagihan = $pembayaran->iuran->biaya * $jumlahPenghuni;
+
+                    if (isset($iuranTerhitung[$key])) {
+                        if (!in_array($pembayaran->iuran->tanggal_tagihan, $iuranTerhitung[$key]['tanggal_tagihan'])) {
+                            $iuranTerhitung[$key]['tanggal_tagihan'][] = $pembayaran->iuran->tanggal_tagihan;
+                        }
+                    } else {
+                        $iuranTerhitung[$key] = [
+                            'id' => $pembayaran->iuran->id,
+                            'alamat' => $data->alamat,
+                            'nama_iuran' => $namaIuran,
+                            'biaya_iuran' => $biayaIuran,
+                            'tanggal_tagihan' => [$pembayaran->iuran->tanggal_tagihan],
+                            'total_tagihan' => $totalTagihan
+                        ];
+                    }
+                }
+            }
+
+            $result = array_values($iuranTerhitung);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Daftar Rumah berdasarkan id berhasil didapat',
+                'data' => [
+                    'alamat' => $data->alamat,
+                    'tagihan' => $result
+                ]
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);

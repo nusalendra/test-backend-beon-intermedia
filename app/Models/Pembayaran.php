@@ -10,9 +10,13 @@ class Pembayaran extends Model
     use HasFactory;
     protected $table = 'pembayarans';
     protected $primarykey = 'id';
-    protected $fillable = ['rumah_id', 'tanggal_pembayaran', 'jumlah_pembayaran', 'status_pembayaran'];
+    protected $fillable = ['penghuni_id', 'iuran_id','tanggal_pembayaran', 'biaya_pembayaran', 'status_pembayaran'];
 
-    public function rumah() {
-        return $this->belongsTo(Rumah::class, 'rumah_id');
+    public function penghuni() {
+        return $this->belongsTo(Penghuni::class, 'penghuni_id');
+    }
+
+    public function iuran() {
+        return $this->belongsTo(Iuran::class, 'iuran_id');
     }
 }
